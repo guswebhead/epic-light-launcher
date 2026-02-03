@@ -26,39 +26,46 @@ export function Store() {
   );
 
   return (
-    <div className="max-w-7xl mx-auto">
-      <div className="min-h-screen bg-gray-900 text-white p-6">
-        <h1 className="text-3xl font-bold mb-4">Epic Light Launcher</h1>
+    <div>
+      <h1 className="text-2xl font-bold mb-4">Store</h1>
 
-        <input
-          type="text"
-          placeholder="Buscar jogo..."
-          className="w-full p-2 mb-4 rounded bg-gray-800"
-          onChange={(e) => setSearch(e.target.value)}
-        />
+      <div className="max-w-7xl mx-auto">
+        <div className="min-h-screen bg-gray-900 text-white p-6">
+          <h1 className="text-3xl font-bold mb-4">Epic Light Launcher</h1>
 
-        {loading ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[...Array(8)].map((_, i) => (
-              <div key={i} className="h-48 bg-gray-700 animate-pulse rounded" />
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {filteredGames.map((game) => (
-              <GameCard
-                key={game.id}
-                title={game.title}
-                image={game.keyImages[0]?.url}
-                slug={game.productSlug}
-              />
-            ))}
+          <input
+            type="text"
+            placeholder="Buscar jogo..."
+            className="w-full p-2 mb-4 rounded bg-gray-800"
+            onChange={(e) => setSearch(e.target.value)}
+          />
 
-            {filteredGames.length === 0 && !loading && (
-              <p className="text-gray-400">Nenhum jogo encontrado.</p>
-            )}
-          </div>
-        )}
+          {loading ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[...Array(8)].map((_, i) => (
+                <div
+                  key={i}
+                  className="h-48 bg-gray-700 animate-pulse rounded"
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {filteredGames.map((game) => (
+                <GameCard
+                  key={game.id}
+                  title={game.title}
+                  image={game.keyImages[0]?.url}
+                  slug={game.productSlug}
+                />
+              ))}
+
+              {filteredGames.length === 0 && !loading && (
+                <p className="text-gray-400">Nenhum jogo encontrado.</p>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
