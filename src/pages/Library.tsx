@@ -1,144 +1,165 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
-  getEpicLibrary,
-  getInstalledEpicGames,
+  getEpicLibraryPaginated,
+  reauthLegendary,
 } from "../api/legendaryApiService";
 import { GameCard } from "../components/GameCard";
 import { GameCardSkeleton } from "../components/GameCardSkeleton";
 
 export function Library() {
   const [games, setGames] = useState<any[]>([]);
-  const [page, setPage] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [processing, setProcessing] = useState(false);
+  const [totalPages, setTotalPages] = useState(1);
   const [totalGames, setTotalGames] = useState(0);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [needsAuth, setNeedsAuth] = useState(false);
+  const [authLoading, setAuthLoading] = useState(false);
+  const [refreshTick, setRefreshTick] = useState(0);
 
-  const pageSize = 24; // quantidade por página
-  const chunkSize = 200;
+  const pageSize = 50; // tamanho de página do backend
+  const inFlightRef = useRef<Map<string, Promise<any>>>(new Map());
+  const requestIdRef = useRef(0);
 
   useEffect(() => {
-    let cancelled = false;
-    let timeoutId: number | undefined;
+    const requestKey = `${currentPage}:${pageSize}`;
+    const requestId = ++requestIdRef.current;
 
-    async function loadLibrary() {
-      setLoading(true);
-      setProcessing(true);
+    let requestPromise = inFlightRef.current.get(requestKey);
+    if (!requestPromise) {
+      requestPromise = getEpicLibraryPaginated(currentPage, pageSize).finally(() => {
+        inFlightRef.current.delete(requestKey);
+      });
+      inFlightRef.current.set(requestKey, requestPromise);
+    }
 
-      const [library, installed] = await Promise.all([
-        getEpicLibrary(),
-        getInstalledEpicGames(),
-      ]);
+    setLoading(true);
+    setErrorMessage(null);
 
-      if (cancelled) {
-        return;
-      }
-
-      setTotalGames(library.length);
-      setPage(0);
-      setGames([]);
-
-      const installedSet = new Set(installed.map((g: any) => g.app_name));
-      let index = 0;
-
-      const processChunk = () => {
-        if (cancelled) {
+    requestPromise
+      .then((libraryResponse) => {
+        if (requestId !== requestIdRef.current) {
           return;
         }
 
-        const slice = library.slice(index, index + chunkSize).map((game: any) => ({
-          ...game,
-          installed: installedSet.has(game.app_name),
-        }));
-
-        setGames((prev) => [...prev, ...slice]);
-
-        index += chunkSize;
-
-        if (index >= chunkSize) {
-          setLoading(false);
+        setGames(libraryResponse.items);
+        const nextTotalPages = Math.max(1, libraryResponse.total_pages || 1);
+        setTotalPages(nextTotalPages);
+        setTotalGames(libraryResponse.total);
+        setNeedsAuth(false);
+        if (currentPage > nextTotalPages) {
+          setCurrentPage(nextTotalPages);
         }
-
-        if (index < library.length) {
-          timeoutId = window.setTimeout(processChunk, 0);
+      })
+      .catch((error) => {
+        console.error("Erro ao carregar biblioteca:", error);
+        if (error instanceof Error) {
+          console.error("Detalhes do erro:", error.message);
+        }
+        const rawMessage = String(error ?? "");
+        if (rawMessage.includes("403 Client Error")) {
+          setErrorMessage(
+            "A Epic retornou 403 (Forbidden). Sua sessao pode ter expirado. Reautentique o Legendary e tente novamente."
+          );
+          setNeedsAuth(true);
         } else {
-          setProcessing(false);
+          setErrorMessage("Falha ao carregar a biblioteca. Tente novamente.");
+          setNeedsAuth(false);
+        }
+        setGames([]);
+        setTotalPages(1);
+        setTotalGames(0);
+      })
+      .finally(() => {
+        if (requestId === requestIdRef.current) {
           setLoading(false);
         }
-      };
-
-      if (library.length === 0) {
-        setProcessing(false);
-        setLoading(false);
-        return;
-      }
-
-      processChunk();
-    }
-
-    loadLibrary();
+      });
 
     return () => {
-      cancelled = true;
-      if (timeoutId) {
-        window.clearTimeout(timeoutId);
-      }
+      requestIdRef.current += 1;
     };
-  }, []);
+  }, [currentPage, pageSize, refreshTick]);
 
-  const totalPages = useMemo(() => {
-    if (totalGames === 0) {
-      return 1;
+  const handleReauth = async () => {
+    try {
+      setAuthLoading(true);
+      await reauthLegendary();
+      setErrorMessage(null);
+      setNeedsAuth(false);
+      setRefreshTick((value) => value + 1);
+    } catch (error) {
+      console.error("Erro ao reautenticar:", error);
+      setErrorMessage(
+        "Falha ao reautenticar. Verifique o login do Legendary e tente novamente."
+      );
+      setNeedsAuth(true);
+    } finally {
+      setAuthLoading(false);
     }
+  };
 
-    return Math.ceil(totalGames / pageSize);
-  }, [totalGames, pageSize]);
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
 
-  const paginatedGames = useMemo(() => {
-    return games.slice(page * pageSize, page * pageSize + pageSize);
-  }, [games, page, pageSize]);
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-4">Página inicial</h1>
+      <h1 className="text-2xl font-bold mb-4">Biblioteca</h1>
 
-      <p className="text-sm text-gray-400 mb-2">
-        Total de jogos: {totalGames || games.length}
-      </p>
-
-      {processing && (
-        <p className="text-xs text-gray-500 mb-4">
-          Carregando mais jogos...
-        </p>
+      {errorMessage && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+          <span>{errorMessage}</span>
+          {needsAuth && (
+            <button
+              onClick={handleReauth}
+              disabled={authLoading}
+              className="rounded bg-red-500/20 px-3 py-1 text-sm font-medium text-red-100 hover:bg-red-500/30 disabled:opacity-60"
+            >
+              {authLoading ? "Reautenticando..." : "Reautenticar"}
+            </button>
+          )}
+        </div>
       )}
 
-      {/* card game */}
+      <p className="text-sm text-gray-400 mb-2">Total de jogos: {totalGames}</p>
+
+      {/* Card game */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
         {loading && [...Array(24)].map((_, i) => <GameCardSkeleton key={i} />)}
 
         {!loading &&
-          paginatedGames.map((game) => (
-            <GameCard key={game.app_name} game={game} />
-          ))}
+          games.map((game) => <GameCard key={game.app_name} game={game} />)}
       </div>
 
       {/* Paginação */}
       <div className="flex justify-center items-center gap-4 mt-6">
         <button
-          disabled={page === 0}
-          onClick={() => setPage((p) => p - 1)}
-          className="bg-gray-700 px-3 py-1 rounded disabled:opacity-40"
+          disabled={currentPage === 1}
+          onClick={handlePreviousPage}
+          className="bg-gray-700 px-3 py-1 rounded disabled:opacity-40 hover:bg-gray-600 disabled:hover:bg-gray-700 transition"
         >
           ⬅ Anterior
         </button>
 
         <span className="text-sm">
-          Página {page + 1} de {totalPages}
+          Página {currentPage} de {totalPages}
         </span>
 
         <button
-          disabled={page + 1 >= totalPages}
-          onClick={() => setPage((p) => p + 1)}
-          className="bg-gray-700 px-3 py-1 rounded disabled:opacity-40"
+          disabled={currentPage >= totalPages}
+          onClick={handleNextPage}
+          className="bg-gray-700 px-3 py-1 rounded disabled:opacity-40 hover:bg-gray-600 disabled:hover:bg-gray-700 transition"
         >
           Próxima ➡
         </button>

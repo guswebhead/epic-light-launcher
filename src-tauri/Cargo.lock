@@ -841,6 +841,7 @@ dependencies = [
 name = "epic-light-launcher"
 version = "0.1.0"
 dependencies = [
+ "lazy_static",
  "reqwest 0.11.27",
  "serde",
  "serde_json",

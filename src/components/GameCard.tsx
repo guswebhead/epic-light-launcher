@@ -21,9 +21,7 @@ export function GameCard({ game }: Props) {
       />
 
       <div className="absolute bottom-0 w-full bg-gradient-to-t from-black p-2">
-        <h3 className="text-sm font-semibold truncate">
-          {game.app_title}
-        </h3>
+        <h3 className="text-sm font-semibold truncate">{game.app_title}</h3>
       </div>
     </div>
   );

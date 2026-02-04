@@ -1,0 +1,129 @@
+use std::process::Command;
+use std::path::PathBuf;
+use serde_json::{json, Value};
+use crate::cache;
+
+const CACHE_KEY_GAMES: &str = "legendary_games";
+const CACHE_KEY_INSTALLED: &str = "legendary_installed";
+const DEFAULT_PAGE_SIZE: usize = 50;
+
+pub fn list_games() -> Result<String, String> {
+    execute_legendary(&["list-games", "--json"])
+}
+
+pub fn list_installed() -> Result<String, String> {
+    execute_legendary(&["list-installed", "--json"])
+}
+
+pub fn list_games_paginated(page: usize, page_size: Option<usize>) -> Result<String, String> {
+    let page_size = page_size.unwrap_or(DEFAULT_PAGE_SIZE);
+    let all_games = get_cached_or_fetch(CACHE_KEY_GAMES, || execute_legendary(&["list-games", "--json"]))?;
+    
+    paginate_json(&all_games, page, page_size)
+}
+
+pub fn list_installed_paginated(page: usize, page_size: Option<usize>) -> Result<String, String> {
+    let page_size = page_size.unwrap_or(DEFAULT_PAGE_SIZE);
+    let all_installed = get_cached_or_fetch(CACHE_KEY_INSTALLED, || execute_legendary(&["list-installed", "--json"]))?;
+    
+    paginate_json(&all_installed, page, page_size)
+}
+
+pub fn auth_relogin() -> Result<String, String> {
+    let _ = execute_legendary(&["auth", "--delete"]);
+    let result = execute_legendary(&["auth"])?;
+    clear_cache();
+    Ok(result)
+}
+
+pub fn clear_cache() {
+    cache::clear(CACHE_KEY_GAMES);
+    cache::clear(CACHE_KEY_INSTALLED);
+}
+
+fn get_cached_or_fetch<F>(cache_key: &str, fetch_fn: F) -> Result<String, String>
+where
+    F: FnOnce() -> Result<String, String>,
+{
+    // Tenta obter do cache
+    if let Some(cached_data) = cache::get(cache_key) {
+        return Ok(cached_data);
+    }
+    
+    // Se não estiver em cache, faz a chamada
+    let data = fetch_fn()?;
+    
+    // Armazena em cache
+    cache::set(cache_key.to_string(), data.clone());
+    
+    Ok(data)
+}
+
+fn paginate_json(json_str: &str, page: usize, page_size: usize) -> Result<String, String> {
+    let data: Value = serde_json::from_str(json_str)
+        .map_err(|e| format!("Erro ao fazer parse do JSON: {}", e))?;
+    
+    let items = if data.is_array() {
+        data.as_array().unwrap().clone()
+    } else if data.is_object() && data.get("data").is_some() {
+        data.get("data").unwrap().as_array().unwrap().clone()
+    } else {
+        return Err("Formato JSON inválido".into());
+    };
+    
+    let total = items.len();
+    let total_pages = (total + page_size - 1) / page_size;
+    
+    if page == 0 || page > total_pages {
+        return Err(format!("Página {} inválida. Total de páginas: {}", page, total_pages));
+    }
+    
+    let start = (page - 1) * page_size;
+    let end = (start + page_size).min(total);
+    
+    let paginated_items: Vec<Value> = items[start..end].to_vec();
+    
+    let response = json!({
+        "items": paginated_items,
+        "page": page,
+        "page_size": page_size,
+        "total": total,
+        "total_pages": total_pages
+    });
+    
+    serde_json::to_string(&response)
+        .map_err(|e| format!("Erro ao serializar resposta: {}", e))
+}
+
+fn get_legendary_path() -> PathBuf {
+    #[cfg(debug_assertions)]
+    {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("bin/legendary.exe")
+    }
+
+    #[cfg(not(debug_assertions))]
+    {
+        let exe_dir = std::env::current_exe()
+            .ok()
+            .and_then(|path| path.parent().map(|p| p.to_path_buf()))
+            .unwrap_or_else(|| PathBuf::from("."));
+        exe_dir.join("legendary.exe")
+    }
+}
+
+fn execute_legendary(args: &[&str]) -> Result<String, String> {
+    let legendary_path = get_legendary_path();
+    
+    let output = Command::new(&legendary_path)
+        .args(args)
+        .output()
+        .map_err(|e| format!("Erro ao executar legendary em {:?}: {}", legendary_path, e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Legendary retornou erro: {}", stderr));
+    }
+
+    let result = String::from_utf8_lossy(&output.stdout).to_string();
+    Ok(result)
+}
