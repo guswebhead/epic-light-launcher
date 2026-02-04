@@ -1,11 +1,16 @@
-use std::process::Command;
 use std::path::PathBuf;
+use std::process::Command;
+use std::sync::Mutex;
 use serde_json::{json, Value};
 use crate::cache;
 
+lazy_static::lazy_static! {
+    static ref LEGENDARY_LOCK: Mutex<()> = Mutex::new(());
+}
+
 const CACHE_KEY_GAMES: &str = "legendary_games";
 const CACHE_KEY_INSTALLED: &str = "legendary_installed";
-const DEFAULT_PAGE_SIZE: usize = 50;
+const DEFAULT_PAGE_SIZE: usize = 48;
 
 pub fn list_games() -> Result<String, String> {
     execute_legendary(&["list-games", "--json"])
@@ -27,6 +32,85 @@ pub fn list_installed_paginated(page: usize, page_size: Option<usize>) -> Result
     let all_installed = get_cached_or_fetch(CACHE_KEY_INSTALLED, || execute_legendary(&["list-installed", "--json"]))?;
     
     paginate_json(&all_installed, page, page_size)
+}
+
+pub fn search_games_paginated(query: String, page: usize, page_size: Option<usize>) -> Result<String, String> {
+    let page_size = page_size.unwrap_or(DEFAULT_PAGE_SIZE);
+    let all_games = get_cached_or_fetch(CACHE_KEY_GAMES, || execute_legendary(&["list-games", "--json"]))?;
+
+    let data: Value = serde_json::from_str(&all_games)
+        .map_err(|e| format!("Erro ao fazer parse do JSON: {}", e))?;
+
+    let items = if data.is_array() {
+        data.as_array().unwrap().clone()
+    } else if data.is_object() && data.get("data").is_some() {
+        data.get("data").unwrap().as_array().unwrap().clone()
+    } else {
+        return Err("Formato JSON invalido".into());
+    };
+
+    let trimmed = query.trim().to_lowercase();
+    if trimmed.is_empty() {
+        return paginate_json(&all_games, page, page_size);
+    }
+
+    let filtered: Vec<Value> = items
+        .into_iter()
+        .filter(|item| {
+            let app_name = item.get("app_name").and_then(Value::as_str).unwrap_or("");
+            let app_title = item.get("app_title").and_then(Value::as_str).unwrap_or("");
+            let title = item
+                .get("metadata")
+                .and_then(|meta| meta.get("title"))
+                .and_then(Value::as_str)
+                .unwrap_or("");
+            let name = item
+                .get("metadata")
+                .and_then(|meta| meta.get("name"))
+                .and_then(Value::as_str)
+                .unwrap_or("");
+
+            let q = trimmed.as_str();
+            app_name.to_lowercase().contains(q)
+                || app_title.to_lowercase().contains(q)
+                || title.to_lowercase().contains(q)
+                || name.to_lowercase().contains(q)
+        })
+        .collect();
+
+    let total = filtered.len();
+    if total == 0 {
+        let response = json!({
+            "items": [],
+            "page": 1,
+            "page_size": page_size,
+            "total": 0,
+            "total_pages": 1
+        });
+
+        return serde_json::to_string(&response)
+            .map_err(|e| format!("Erro ao serializar resposta: {}", e));
+    }
+
+    let total_pages = (total + page_size - 1) / page_size;
+    if page == 0 || page > total_pages {
+        return Err(format!("Pagina {} invalida. Total de paginas: {}", page, total_pages));
+    }
+
+    let start = (page - 1) * page_size;
+    let end = (start + page_size).min(total);
+    let paginated_items: Vec<Value> = filtered[start..end].to_vec();
+
+    let response = json!({
+        "items": paginated_items,
+        "page": page,
+        "page_size": page_size,
+        "total": total,
+        "total_pages": total_pages
+    });
+
+    serde_json::to_string(&response)
+        .map_err(|e| format!("Erro ao serializar resposta: {}", e))
 }
 
 pub fn get_game_by_app_name(app_name: String) -> Result<String, String> {
@@ -55,8 +139,9 @@ pub fn get_game_by_app_name(app_name: String) -> Result<String, String> {
 }
 
 pub fn auth_relogin() -> Result<String, String> {
-    let _ = execute_legendary(&["auth", "--delete"]);
-    let result = execute_legendary(&["auth"])?;
+    let _lock = LEGENDARY_LOCK.lock().unwrap();
+    let _ = execute_legendary_inner(&["auth", "--delete"]);
+    let result = execute_legendary_inner(&["auth"])?;
     clear_cache();
     Ok(result)
 }
@@ -137,6 +222,11 @@ fn get_legendary_path() -> PathBuf {
 }
 
 fn execute_legendary(args: &[&str]) -> Result<String, String> {
+    let _lock = LEGENDARY_LOCK.lock().unwrap();
+    execute_legendary_inner(args)
+}
+
+fn execute_legendary_inner(args: &[&str]) -> Result<String, String> {
     let legendary_path = get_legendary_path();
     
     let output = Command::new(&legendary_path)

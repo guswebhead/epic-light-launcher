@@ -69,9 +69,22 @@ export async function getEpicLibraryPaginated(
     page_size: pageSize,
     pageSize,
   });
-  return parsePaginatedResponse(data, pageSize ?? 50);
+  return parsePaginatedResponse(data, pageSize ?? 38);
 }
 
+export async function searchEpicLibraryPaginated(
+  query: string,
+  page: number,
+  pageSize?: number
+): Promise<PaginatedResponse<any>> {
+  const data = await invoke("legendary_search_games_paginated", {
+    query,
+    page,
+    page_size: pageSize,
+    pageSize,
+  });
+  return parsePaginatedResponse(data, pageSize ?? 38);
+}
 
 export async function clearLegendaryCache(): Promise<void> {
   await invoke("legendary_clear_cache");

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   getEpicLibraryPaginated,
+  searchEpicLibraryPaginated,
   reauthLegendary,
 } from "../api/legendaryApiService";
 import { GameCard } from "../components/GameCard";
@@ -16,18 +17,36 @@ export function Library() {
   const [needsAuth, setNeedsAuth] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
-  const pageSize = 50; // tamanho de página do backend
+  const pageSize = 36; // tamanho de página do backend
   const inFlightRef = useRef<Map<string, Promise<any>>>(new Map());
   const requestIdRef = useRef(0);
 
   useEffect(() => {
-    const requestKey = `${currentPage}:${pageSize}`;
+    const handle = setTimeout(() => {
+      setDebouncedSearch(searchTerm.trim());
+    }, 300);
+
+    return () => clearTimeout(handle);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch]);
+
+  useEffect(() => {
+    const requestKey = `${debouncedSearch}:${currentPage}:${pageSize}`;
     const requestId = ++requestIdRef.current;
+    const isSearching = debouncedSearch.length > 0;
 
     let requestPromise = inFlightRef.current.get(requestKey);
     if (!requestPromise) {
-      requestPromise = getEpicLibraryPaginated(currentPage, pageSize).finally(() => {
+      const fetcher = isSearching
+        ? searchEpicLibraryPaginated(debouncedSearch, currentPage, pageSize)
+        : getEpicLibraryPaginated(currentPage, pageSize);
+      requestPromise = fetcher.finally(() => {
         inFlightRef.current.delete(requestKey);
       });
       inFlightRef.current.set(requestKey, requestPromise);
@@ -79,7 +98,7 @@ export function Library() {
     return () => {
       requestIdRef.current += 1;
     };
-  }, [currentPage, pageSize, refreshTick]);
+  }, [currentPage, pageSize, refreshTick, debouncedSearch]);
 
   const handleReauth = async () => {
     try {
@@ -117,6 +136,24 @@ export function Library() {
     <div>
       <h1 className="text-2xl font-bold mb-4">Biblioteca</h1>
 
+      <div className="mb-3 flex max-w-md items-center gap-2">
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={(event) => setSearchTerm(event.target.value)}
+          placeholder="Buscar jogo..."
+          className="w-full flex-1 rounded bg-gray-800/70 px-3 py-2 text-sm text-gray-100 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-600/60"
+        />
+        {searchTerm && (
+          <button
+            onClick={() => setSearchTerm("")}
+            className="rounded bg-gray-700 px-3 py-2 text-sm text-gray-200 hover:bg-gray-600"
+          >
+            Limpar
+          </button>
+        )}
+      </div>
+
       {errorMessage && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">
           <span>{errorMessage}</span>
@@ -149,7 +186,7 @@ export function Library() {
           onClick={handlePreviousPage}
           className="bg-gray-700 px-3 py-1 rounded disabled:opacity-40 hover:bg-gray-600 disabled:hover:bg-gray-700 transition"
         >
-          ⬅ Anterior
+          Anterior
         </button>
 
         <span className="text-sm">
@@ -161,7 +198,7 @@ export function Library() {
           onClick={handleNextPage}
           className="bg-gray-700 px-3 py-1 rounded disabled:opacity-40 hover:bg-gray-600 disabled:hover:bg-gray-700 transition"
         >
-          Próxima ➡
+          Próxima
         </button>
       </div>
     </div>
