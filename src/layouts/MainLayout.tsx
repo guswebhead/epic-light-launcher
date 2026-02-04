@@ -12,7 +12,7 @@ export function MainLayout() {
   return (
     <div className="flex h-screen bg-gray-900 text-white">
       <aside className="w-64 bg-gray-800 p-4 flex flex-col gap-2">
-        <h2 className="text-xl font-bold mb-4">Epic Light</h2>
+        <h2 className="text-xl font-bold mb-4">Omega</h2>
 
         {/* Store */}
         <div
