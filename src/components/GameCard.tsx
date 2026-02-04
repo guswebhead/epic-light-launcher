@@ -11,7 +11,11 @@ export function GameCard({ game }: Props) {
 
   return (
     <div
-      onClick={() => navigate(`/game/${game.app_name}`)}
+      onClick={() =>
+        navigate(`/game/${game.app_name}`, {
+          state: { game },
+        })
+      }
       className="relative cursor-pointer group rounded overflow-hidden bg-gray-800 hover:shadow-xl transition"
     >
       <img

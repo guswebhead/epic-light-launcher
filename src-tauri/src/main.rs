@@ -4,7 +4,7 @@ mod commands;
 mod legendary;
 mod cache;
 
-use commands::{legendary_list_games, legendary_list_installed, legendary_list_games_paginated, legendary_list_installed_paginated, legendary_clear_cache, legendary_auth};
+use commands::{legendary_list_games, legendary_list_installed, legendary_list_games_paginated, legendary_list_installed_paginated, legendary_clear_cache, legendary_auth, legendary_get_game};
 
 fn main() {
     tauri::Builder::default()
@@ -13,6 +13,7 @@ fn main() {
             legendary_list_installed,
             legendary_list_games_paginated,
             legendary_list_installed_paginated,
+            legendary_get_game,
             legendary_auth,
             legendary_clear_cache
         ])

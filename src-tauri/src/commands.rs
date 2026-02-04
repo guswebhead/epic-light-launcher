@@ -21,6 +21,11 @@ pub fn legendary_list_installed_paginated(page: usize, page_size: Option<usize>)
 }
 
 #[tauri::command]
+pub fn legendary_get_game(app_name: String) -> Result<String, String> {
+    legendary::get_game_by_app_name(app_name)
+}
+
+#[tauri::command]
 pub fn legendary_auth() -> Result<String, String> {
     legendary::auth_relogin()
 }

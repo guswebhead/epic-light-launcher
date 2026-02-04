@@ -81,3 +81,10 @@ export async function reauthLegendary(): Promise<string> {
   const data = await invoke<string>("legendary_auth");
   return data ?? "";
 }
+
+export async function getEpicGameDetails(appName: string): Promise<any> {
+  const data = await invoke<string>("legendary_get_game", {
+    app_name: appName,
+  });
+  return typeof data === "string" ? JSON.parse(data) : data;
+}

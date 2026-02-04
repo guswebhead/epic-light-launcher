@@ -29,6 +29,31 @@ pub fn list_installed_paginated(page: usize, page_size: Option<usize>) -> Result
     paginate_json(&all_installed, page, page_size)
 }
 
+pub fn get_game_by_app_name(app_name: String) -> Result<String, String> {
+    let all_games = get_cached_or_fetch(CACHE_KEY_GAMES, || execute_legendary(&["list-games", "--json"]))?;
+
+    let data: Value = serde_json::from_str(&all_games)
+        .map_err(|e| format!("Erro ao fazer parse do JSON: {}", e))?;
+
+    let items = if data.is_array() {
+        data.as_array().unwrap().clone()
+    } else if data.is_object() && data.get("data").is_some() {
+        data.get("data").unwrap().as_array().unwrap().clone()
+    } else {
+        return Err("Formato JSON inválido".into());
+    };
+
+    let selected = items
+        .into_iter()
+        .find(|item| item.get("app_name").and_then(Value::as_str) == Some(app_name.as_str()));
+
+    match selected {
+        Some(game) => serde_json::to_string(&game)
+            .map_err(|e| format!("Erro ao serializar resposta: {}", e)),
+        None => Err(format!("Jogo não encontrado: {}", app_name)),
+    }
+}
+
 pub fn auth_relogin() -> Result<String, String> {
     let _ = execute_legendary(&["auth", "--delete"]);
     let result = execute_legendary(&["auth"])?;
