@@ -1,72 +1,50 @@
 import { useEffect, useState } from "react";
-import { fetchFreeGames } from "../api/epicStoreService";
-import { GameCard } from "../components/GameCard";
-
-type EpicGame = {
-  id: string;
-  title: string;
-  keyImages: { url: string }[];
-  productSlug: string;
-};
+import { fetchHighlights } from "../api/storeService";
+// import { GameCard } from "../components/GameCard";
+import { fetchAllGames } from "../api/storeSearchService";
 
 export function Store() {
-  const [games, setGames] = useState<EpicGame[]>([]);
+  const [games, setGames] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
+  const [page] = useState(0);
 
   useEffect(() => {
-    fetchFreeGames().then((data) => {
-      setGames(data);
-      setLoading(false);
-    });
-  }, []);
+    fetchAllGames(page * 40).then(setGames);
+  }, [page]);
 
-  const filteredGames = games.filter((game) =>
-    game.title.toLowerCase().includes(search.toLowerCase()),
-  );
+  useEffect(() => {
+    fetchHighlights()
+      .then((data) => {
+        console.log("Jogos da Store:", data);
+        setGames(data);
+      })
+      .catch((err) => console.error(err))
+      .finally(() => setLoading(false));
+  }, []);
 
   return (
     <div>
       <h1 className="text-2xl font-bold mb-4">Store</h1>
 
-      <div className="max-w-7xl mx-auto">
-        <div className="min-h-screen bg-gray-900 text-white p-6">
-          <h1 className="text-3xl font-bold mb-4">Epic Light Launcher</h1>
-
-          <input
-            type="text"
-            placeholder="Buscar jogo..."
-            className="w-full p-2 mb-4 rounded bg-gray-800"
-            onChange={(e) => setSearch(e.target.value)}
-          />
-
-          {loading ? (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {[...Array(8)].map((_, i) => (
-                <div
-                  key={i}
-                  className="h-48 bg-gray-700 animate-pulse rounded"
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {filteredGames.map((game) => (
-                <GameCard
-                  key={game.id}
-                  title={game.title}
-                  image={game.keyImages[0]?.url}
-                  slug={game.productSlug}
-                />
-              ))}
-
-              {filteredGames.length === 0 && !loading && (
-                <p className="text-gray-400">Nenhum jogo encontrado.</p>
-              )}
-            </div>
-          )}
+      {loading && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[...Array(8)].map((_, i) => (
+            <div key={i} className="h-48 bg-gray-700 animate-pulse rounded" />
+          ))}
         </div>
-      </div>
+      )}
+
+      {/* {!loading && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {games.map(() => (
+            // <GameCard
+            //   key={game.id}
+            //   title={game.title}
+            //   image={game.keyImages?.[0]?.url}
+            // />
+          ))}
+        </div>
+      )} */}
     </div>
   );
 }

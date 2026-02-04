@@ -1,28 +1,29 @@
-type GameCardProps = {
-  title: string;
-  image: string;
-  slug: string;
+import { useNavigate } from "react-router-dom";
+import { getGameImage } from "../utils/getGameImage";
+
+type Props = {
+  game: any;
 };
 
-export function GameCard({ title, image, slug }: GameCardProps) {
-  const openInEpic = () => {
-    window.open(`com.epicgames.launcher://store/p/${slug}`);
-  };
+export function GameCard({ game }: Props) {
+  const navigate = useNavigate();
+  const image = getGameImage(game);
 
   return (
     <div
-      className="bg-gray-800 rounded overflow-hidden 
-hover:scale-105 hover:shadow-xl transition-all duration-200"
+      onClick={() => navigate(`/game/${game.app_name}`)}
+      className="relative cursor-pointer group rounded overflow-hidden bg-gray-800 hover:shadow-xl transition"
     >
-      <img src={image} alt={title} className="h-40 w-full object-cover" />
-      <div className="p-2">
-        <h3 className="text-sm font-semibold">{title}</h3>
-        <button
-          onClick={openInEpic}
-          className="mt-2 w-full bg-blue-600 hover:bg-blue-700 p-1 rounded text-sm"
-        >
-          Abrir na Epic
-        </button>
+      <img
+        src={image}
+        alt={game.app_title}
+        className="w-full h-64 object-cover group-hover:scale-105 transition"
+      />
+
+      <div className="absolute bottom-0 w-full bg-gradient-to-t from-black p-2">
+        <h3 className="text-sm font-semibold truncate">
+          {game.app_title}
+        </h3>
       </div>
     </div>
   );
