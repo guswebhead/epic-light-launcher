@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Mutex;
+use std::time::Instant;
 use serde_json::{json, Value};
 use crate::cache;
 
@@ -10,6 +11,7 @@ lazy_static::lazy_static! {
 
 const CACHE_KEY_GAMES: &str = "legendary_games";
 const CACHE_KEY_INSTALLED: &str = "legendary_installed";
+const CACHE_KEY_STATUS: &str = "legendary_status";
 const DEFAULT_PAGE_SIZE: usize = 48;
 
 pub fn list_games() -> Result<String, String> {
@@ -32,6 +34,10 @@ pub fn list_installed_paginated(page: usize, page_size: Option<usize>) -> Result
     let all_installed = get_cached_or_fetch(CACHE_KEY_INSTALLED, || execute_legendary(&["list-installed", "--json"]))?;
     
     paginate_json(&all_installed, page, page_size)
+}
+
+pub fn get_status() -> Result<String, String> {
+    get_cached_or_fetch(CACHE_KEY_STATUS, || execute_legendary(&["status", "--json", "--offline"]))
 }
 
 pub fn search_games_paginated(query: String, page: usize, page_size: Option<usize>) -> Result<String, String> {
@@ -149,6 +155,7 @@ pub fn auth_relogin() -> Result<String, String> {
 pub fn clear_cache() {
     cache::clear(CACHE_KEY_GAMES);
     cache::clear(CACHE_KEY_INSTALLED);
+    cache::clear(CACHE_KEY_STATUS);
 }
 
 fn get_cached_or_fetch<F>(cache_key: &str, fetch_fn: F) -> Result<String, String>
@@ -228,17 +235,42 @@ fn execute_legendary(args: &[&str]) -> Result<String, String> {
 
 fn execute_legendary_inner(args: &[&str]) -> Result<String, String> {
     let legendary_path = get_legendary_path();
+    let start = Instant::now();
+
+    eprintln!("[legendary] exec {:?} {:?}", legendary_path, args);
     
     let output = Command::new(&legendary_path)
         .args(args)
         .output()
         .map_err(|e| format!("Erro ao executar legendary em {:?}: {}", legendary_path, e))?;
 
+    let duration_ms = start.elapsed().as_millis();
+
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
+        eprintln!(
+            "[legendary] erro status={} duracao={}ms stderr={}",
+            output.status,
+            duration_ms,
+            truncate_for_log(&stderr, 600)
+        );
         return Err(format!("Legendary retornou erro: {}", stderr));
     }
 
     let result = String::from_utf8_lossy(&output.stdout).to_string();
+    eprintln!(
+        "[legendary] ok status={} duracao={}ms",
+        output.status,
+        duration_ms
+    );
     Ok(result)
+}
+
+fn truncate_for_log(value: &str, max_len: usize) -> String {
+    if value.len() <= max_len {
+        return value.to_string();
+    }
+    let mut truncated = value.chars().take(max_len).collect::<String>();
+    truncated.push_str("...");
+    truncated
 }

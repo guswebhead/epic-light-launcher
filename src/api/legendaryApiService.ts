@@ -1,5 +1,20 @@
 import { invoke } from "@tauri-apps/api/core";
 
+const inflightRequests = new Map<string, Promise<any>>();
+
+function dedupeRequest<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
+  const existing = inflightRequests.get(key);
+  if (existing) {
+    return existing as Promise<T>;
+  }
+
+  const promise = fetcher().finally(() => {
+    inflightRequests.delete(key);
+  });
+  inflightRequests.set(key, promise);
+  return promise;
+}
+
 export interface PaginatedResponse<T> {
   items: T[];
   page: number;
@@ -51,25 +66,32 @@ function parsePaginatedResponse<T>(
 }
 
 export async function getEpicLibrary() {
-  const data = await invoke<string>("legendary_list_games");
-  return JSON.parse(data);
+  return dedupeRequest("legendary_list_games", async () => {
+    const data = await invoke<string>("legendary_list_games");
+    return JSON.parse(data);
+  });
 }
 
 export async function getInstalledEpicGames() {
-  const data = await invoke<string>("legendary_list_installed");
-  return JSON.parse(data);
+  return dedupeRequest("legendary_list_installed", async () => {
+    const data = await invoke<string>("legendary_list_installed");
+    return JSON.parse(data);
+  });
 }
 
 export async function getEpicLibraryPaginated(
   page: number,
   pageSize?: number
 ): Promise<PaginatedResponse<any>> {
-  const data = await invoke("legendary_list_games_paginated", {
-    page,
-    page_size: pageSize,
-    pageSize,
+  const key = `legendary_list_games_paginated:${page}:${pageSize ?? ""}`;
+  return dedupeRequest(key, async () => {
+    const data = await invoke("legendary_list_games_paginated", {
+      page,
+      page_size: pageSize,
+      pageSize,
+    });
+    return parsePaginatedResponse(data, pageSize ?? 38);
   });
-  return parsePaginatedResponse(data, pageSize ?? 38);
 }
 
 export async function searchEpicLibraryPaginated(
@@ -77,13 +99,16 @@ export async function searchEpicLibraryPaginated(
   page: number,
   pageSize?: number
 ): Promise<PaginatedResponse<any>> {
-  const data = await invoke("legendary_search_games_paginated", {
-    query,
-    page,
-    page_size: pageSize,
-    pageSize,
+  const key = `legendary_search_games_paginated:${query}:${page}:${pageSize ?? ""}`;
+  return dedupeRequest(key, async () => {
+    const data = await invoke("legendary_search_games_paginated", {
+      query,
+      page,
+      page_size: pageSize,
+      pageSize,
+    });
+    return parsePaginatedResponse(data, pageSize ?? 38);
   });
-  return parsePaginatedResponse(data, pageSize ?? 38);
 }
 
 export async function clearLegendaryCache(): Promise<void> {
@@ -96,8 +121,60 @@ export async function reauthLegendary(): Promise<string> {
 }
 
 export async function getEpicGameDetails(appName: string): Promise<any> {
-  const data = await invoke<string>("legendary_get_game", {
-    app_name: appName,
+  const key = `legendary_get_game:${appName}`;
+  return dedupeRequest(key, async () => {
+    const data = await invoke<string>("legendary_get_game", {
+      app_name: appName,
+    });
+    return typeof data === "string" ? JSON.parse(data) : data;
   });
-  return typeof data === "string" ? JSON.parse(data) : data;
+}
+
+export async function getLegendaryStatus(): Promise<any> {
+  return dedupeRequest("legendary_status", async () => {
+    const data = await invoke<string>("legendary_status");
+    return typeof data === "string" ? JSON.parse(data) : data;
+  });
+}
+
+export async function epicGraphqlQuery(
+  query: string,
+  variables?: Record<string, any>
+): Promise<any> {
+  const key = `epic_graphql_query:${query}:${JSON.stringify(variables ?? {})}`;
+  return dedupeRequest(key, async () => {
+    const data = await invoke<string>("epic_graphql_query", {
+      query,
+      variables,
+    });
+    return typeof data === "string" ? JSON.parse(data) : data;
+  });
+}
+
+export async function getEpicWishlist(
+  country?: string,
+  locale?: string
+): Promise<any> {
+  const key = `epic_graphql_wishlist:${country ?? ""}:${locale ?? ""}`;
+  return dedupeRequest(key, async () => {
+    const data = await invoke<string>("epic_graphql_wishlist", {
+      country,
+      locale,
+    });
+    return typeof data === "string" ? JSON.parse(data) : data;
+  });
+}
+
+export async function getEpicFriends(): Promise<any> {
+  return dedupeRequest("epic_graphql_friends", async () => {
+    const data = await invoke<string>("epic_graphql_friends");
+    return typeof data === "string" ? JSON.parse(data) : data;
+  });
+}
+
+export async function getEpicProfileBasic(): Promise<any> {
+  return dedupeRequest("epic_graphql_profile_basic", async () => {
+    const data = await invoke<string>("epic_graphql_profile_basic");
+    return typeof data === "string" ? JSON.parse(data) : data;
+  });
 }

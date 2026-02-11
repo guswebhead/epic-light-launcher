@@ -11,7 +11,7 @@ lazy_static::lazy_static! {
     static ref CACHE: Mutex<HashMap<String, CacheData>> = Mutex::new(HashMap::new());
 }
 
-const CACHE_DURATION_SECS: u64 = 3600; // 1 hora
+const CACHE_DURATION_SECS: u64 = 6 * 60 * 60; // 6 horas
 
 #[derive(Serialize, Deserialize)]
 struct PersistedCache {
