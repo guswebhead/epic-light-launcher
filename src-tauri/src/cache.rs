@@ -76,6 +76,7 @@ pub fn clear(key: &str) {
     let _ = delete_from_disk(key);
 }
 
+#[allow(dead_code)]
 pub fn clear_all() {
     let mut cache = CACHE.lock().unwrap();
     cache.clear();
@@ -122,6 +123,7 @@ fn delete_from_disk(key: &str) -> std::io::Result<()> {
     Ok(())
 }
 
+#[allow(dead_code)]
 fn clear_disk_cache() -> std::io::Result<()> {
     let path = cache_dir();
     if path.exists() {

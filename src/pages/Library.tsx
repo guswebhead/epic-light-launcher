@@ -6,9 +6,16 @@ import {
 } from "../api/legendaryApiService";
 import { GameCard } from "../components/GameCard";
 import { GameCardSkeleton } from "../components/GameCardSkeleton";
+import { LibrarySearchBar } from "../components/LibrarySearchBar";
+import { LibraryPagination } from "../components/LibraryPagination";
+import { LibraryErrorAlert } from "../components/LibraryErrorAlert";
+import { useDebounce } from "../hooks/useDebounce";
+import type { EpicGame, PaginatedData } from "../types/EpicGame";
+
+const PAGE_SIZE = 36;
 
 export function Library() {
-  const [games, setGames] = useState<any[]>([]);
+  const [games, setGames] = useState<EpicGame[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [totalPages, setTotalPages] = useState(1);
@@ -16,36 +23,30 @@ export function Library() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [needsAuth, setNeedsAuth] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
-  const [refreshTick, setRefreshTick] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [refreshTick, setRefreshTick] = useState(0);
 
-  const pageSize = 36; // tamanho de página do backend
-  const inFlightRef = useRef<Map<string, Promise<any>>>(new Map());
+  const debouncedSearch = useDebounce(searchTerm, 300);
+  const inFlightRef = useRef<Map<string, Promise<PaginatedData<EpicGame>>>>(
+    new Map()
+  );
   const requestIdRef = useRef(0);
-
-  useEffect(() => {
-    const handle = setTimeout(() => {
-      setDebouncedSearch(searchTerm.trim());
-    }, 300);
-
-    return () => clearTimeout(handle);
-  }, [searchTerm]);
 
   useEffect(() => {
     setCurrentPage(1);
   }, [debouncedSearch]);
 
   useEffect(() => {
-    const requestKey = `${debouncedSearch}:${currentPage}:${pageSize}`;
+    const trimmedSearch = debouncedSearch.trim();
+    const requestKey = `${trimmedSearch}:${currentPage}:${PAGE_SIZE}`;
     const requestId = ++requestIdRef.current;
-    const isSearching = debouncedSearch.length > 0;
+    const isSearching = trimmedSearch.length > 0;
 
     let requestPromise = inFlightRef.current.get(requestKey);
     if (!requestPromise) {
       const fetcher = isSearching
-        ? searchEpicLibraryPaginated(debouncedSearch, currentPage, pageSize)
-        : getEpicLibraryPaginated(currentPage, pageSize);
+        ? searchEpicLibraryPaginated(trimmedSearch, currentPage, PAGE_SIZE)
+        : getEpicLibraryPaginated(currentPage, PAGE_SIZE);
       requestPromise = fetcher.finally(() => {
         inFlightRef.current.delete(requestKey);
       });
@@ -98,7 +99,7 @@ export function Library() {
     return () => {
       requestIdRef.current += 1;
     };
-  }, [currentPage, pageSize, refreshTick, debouncedSearch]);
+  }, [currentPage, refreshTick, debouncedSearch]);
 
   const handleReauth = async () => {
     try {
@@ -136,37 +137,15 @@ export function Library() {
     <div>
       <h1 className="text-2xl font-bold mb-4">Biblioteca</h1>
 
-      <div className="mb-3 flex max-w-md items-center gap-2">
-        <input
-          type="text"
-          value={searchTerm}
-          onChange={(event) => setSearchTerm(event.target.value)}
-          placeholder="Buscar jogo..."
-          className="w-full flex-1 rounded bg-gray-800/70 px-3 py-2 text-sm text-gray-100 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-600/60"
-        />
-        {searchTerm && (
-          <button
-            onClick={() => setSearchTerm("")}
-            className="rounded bg-gray-700 px-3 py-2 text-sm text-gray-200 hover:bg-gray-600"
-          >
-            Limpar
-          </button>
-        )}
-      </div>
+      <LibrarySearchBar searchTerm={searchTerm} onSearchChange={setSearchTerm} />
 
       {errorMessage && (
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">
-          <span>{errorMessage}</span>
-          {needsAuth && (
-            <button
-              onClick={handleReauth}
-              disabled={authLoading}
-              className="rounded bg-red-500/20 px-3 py-1 text-sm font-medium text-red-100 hover:bg-red-500/30 disabled:opacity-60"
-            >
-              {authLoading ? "Reautenticando..." : "Reautenticar"}
-            </button>
-          )}
-        </div>
+        <LibraryErrorAlert
+          errorMessage={errorMessage}
+          needsAuth={needsAuth}
+          authLoading={authLoading}
+          onReauth={handleReauth}
+        />
       )}
 
       <p className="text-sm text-gray-400 mb-2">Total de jogos: {totalGames}</p>
@@ -180,27 +159,13 @@ export function Library() {
       </div>
 
       {/* Paginação */}
-      <div className="flex justify-center items-center gap-4 mt-6">
-        <button
-          disabled={currentPage === 1}
-          onClick={handlePreviousPage}
-          className="bg-gray-700 px-3 py-1 rounded disabled:opacity-40 hover:bg-gray-600 disabled:hover:bg-gray-700 transition"
-        >
-          Anterior
-        </button>
-
-        <span className="text-sm">
-          Página {currentPage} de {totalPages}
-        </span>
-
-        <button
-          disabled={currentPage >= totalPages}
-          onClick={handleNextPage}
-          className="bg-gray-700 px-3 py-1 rounded disabled:opacity-40 hover:bg-gray-600 disabled:hover:bg-gray-700 transition"
-        >
-          Próxima
-        </button>
-      </div>
+      <LibraryPagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPreviousPage={handlePreviousPage}
+        onNextPage={handleNextPage}
+      />
     </div>
   );
 }
+

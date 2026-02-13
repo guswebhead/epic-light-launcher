@@ -1,4 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { EpicGame, PaginatedData } from "../types/EpicGame";
+
+// Alias for backwards compatibility
+type PaginatedResponse<T> = PaginatedData<T>;
 
 const inflightRequests = new Map<string, Promise<any>>();
 
@@ -13,14 +17,6 @@ function dedupeRequest<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
   });
   inflightRequests.set(key, promise);
   return promise;
-}
-
-export interface PaginatedResponse<T> {
-  items: T[];
-  page: number;
-  page_size: number;
-  total: number;
-  total_pages: number;
 }
 
 type RawPaginatedResponse<T> = Partial<{
@@ -82,7 +78,7 @@ export async function getInstalledEpicGames() {
 export async function getEpicLibraryPaginated(
   page: number,
   pageSize?: number
-): Promise<PaginatedResponse<any>> {
+): Promise<PaginatedData<EpicGame>> {
   const key = `legendary_list_games_paginated:${page}:${pageSize ?? ""}`;
   return dedupeRequest(key, async () => {
     const data = await invoke("legendary_list_games_paginated", {
@@ -98,7 +94,7 @@ export async function searchEpicLibraryPaginated(
   query: string,
   page: number,
   pageSize?: number
-): Promise<PaginatedResponse<any>> {
+): Promise<PaginatedData<EpicGame>> {
   const key = `legendary_search_games_paginated:${query}:${page}:${pageSize ?? ""}`;
   return dedupeRequest(key, async () => {
     const data = await invoke("legendary_search_games_paginated", {
@@ -120,7 +116,7 @@ export async function reauthLegendary(): Promise<string> {
   return data ?? "";
 }
 
-export async function getEpicGameDetails(appName: string): Promise<any> {
+export async function getEpicGameDetails(appName: string): Promise<EpicGame> {
   const key = `legendary_get_game:${appName}`;
   return dedupeRequest(key, async () => {
     const data = await invoke<string>("legendary_get_game", {

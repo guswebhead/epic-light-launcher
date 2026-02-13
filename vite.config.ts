@@ -29,4 +29,24 @@ export default defineConfig(async () => ({
       ignored: ["**/src-tauri/**"],
     },
   },
+
+  // Build optimization
+  build: {
+    rollupOptions: {
+      output: {
+        // Code-splitting strategy: each route lazy-loaded as separate chunk
+        manualChunks(id) {
+          if (id.includes("node_modules")) {
+            return "vendor";
+          }
+          if (id.includes("src/pages/")) {
+            const match = id.match(/pages\/([^\/]+)/);
+            if (match?.[1]) {
+              return `page-${match[1]}`;
+            }
+          }
+        },
+      },
+    },
+  },
 }));

@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { fetchHighlights, fetchPromotions } from "../api/storeService";
 import { StoreGameCard } from "../components/StoreGameCard";
+import type { StoreGame } from "../types/EpicGame";
 
 export function Store() {
-  const [freeGames, setFreeGames] = useState<any[]>([]);
-  const [promotions, setPromotions] = useState<any[]>([]);
+  const [freeGames, setFreeGames] = useState<StoreGame[]>([]);
+  const [promotions, setPromotions] = useState<StoreGame[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

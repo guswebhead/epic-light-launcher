@@ -56,7 +56,6 @@ struct LegendaryUser {
     account_id: Option<String>,
     display_name: Option<String>,
     expires_at: Option<String>,
-    refresh_expires_at: Option<String>,
 }
 
 fn legendary_user_paths() -> Vec<PathBuf> {
@@ -98,16 +97,11 @@ fn load_legendary_user() -> Result<LegendaryUser, String> {
                     .get("expires_at")
                     .and_then(Value::as_str)
                     .map(|val| val.to_string());
-                let refresh_expires_at = value
-                    .get("refresh_expires_at")
-                    .and_then(Value::as_str)
-                    .map(|val| val.to_string());
                 return Ok(LegendaryUser {
                     access_token,
                     account_id,
                     display_name,
                     expires_at,
-                    refresh_expires_at,
                 });
             }
             Err(err) => {
@@ -248,6 +242,7 @@ impl EpicGraphQLClient {
         parse_graphql_response(text)
     }
 
+    #[allow(dead_code)]
     async fn try_get(
         &self,
         endpoint: &str,

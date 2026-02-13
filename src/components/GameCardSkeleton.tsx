@@ -1,4 +1,6 @@
-export function GameCardSkeleton() {
+import { memo } from "react";
+
+function GameCardSkeletonComponent() {
   return (
     <div className="bg-gray-800 rounded overflow-hidden animate-pulse">
       <div className="h-64 bg-gray-700" />
@@ -9,3 +11,5 @@ export function GameCardSkeleton() {
     </div>
   );
 }
+
+export const GameCardSkeleton = memo(GameCardSkeletonComponent);

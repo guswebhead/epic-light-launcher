@@ -1,26 +1,29 @@
 import { useNavigate } from "react-router-dom";
+import { memo, useCallback } from "react";
 import { getGameImage } from "../utils/getGameImage";
+import type { EpicGame } from "../types/EpicGame";
 
 type Props = {
-  game: any;
+  game: EpicGame;
 };
 
-export function GameCard({ game }: Props) {
+function GameCardComponent({ game }: Props) {
   const navigate = useNavigate();
   const image = getGameImage(game);
 
+  const handleNavigate = useCallback(() => {
+    navigate(`/game/${game.app_name}`, { state: { game } });
+  }, [game, navigate]);
+
   return (
     <div
-      onClick={() =>
-        navigate(`/game/${game.app_name}`, {
-          state: { game },
-        })
-      }
+      onClick={handleNavigate}
       className="relative cursor-pointer group rounded overflow-hidden bg-gray-800 hover:shadow-xl transition"
     >
       <img
         src={image}
         alt={game.app_title}
+        loading="lazy"
         className="w-full h-64 object-cover group-hover:scale-105 transition"
       />
 
@@ -30,3 +33,5 @@ export function GameCard({ game }: Props) {
     </div>
   );
 }
+
+export const GameCard = memo(GameCardComponent);

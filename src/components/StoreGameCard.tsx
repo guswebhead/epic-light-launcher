@@ -1,23 +1,5 @@
-type StoreImage = {
-  type?: string;
-  url?: string;
-};
-
-type StorePrice = {
-  discountPrice?: number;
-  originalPrice?: number;
-  discountPercentage?: number;
-  currencyCode?: string;
-};
-
-type StoreGame = {
-  title?: string;
-  productSlug?: string;
-  keyImages?: StoreImage[];
-  price?: {
-    totalPrice?: StorePrice;
-  };
-};
+import { memo, useCallback } from "react";
+import type { StoreGame, PriceInfo } from "../types/EpicGame";
 
 type Props = {
   game: StoreGame;
@@ -31,7 +13,7 @@ const IMAGE_PRIORITY = [
   "Screenshot",
 ];
 
-function pickImage(images?: StoreImage[]) {
+function pickImage(images: StoreGame["keyImages"]): string | undefined {
   if (!images || images.length === 0) {
     return undefined;
   }
@@ -44,7 +26,7 @@ function pickImage(images?: StoreImage[]) {
   return images[0]?.url;
 }
 
-function formatPrice(value?: number, currency = "BRL") {
+function formatPrice(value: number | undefined, currency = "BRL"): string {
   if (typeof value !== "number") {
     return "";
   }
@@ -54,22 +36,22 @@ function formatPrice(value?: number, currency = "BRL") {
   }).format(value / 100);
 }
 
-function resolvePrice(total?: StorePrice) {
+function resolvePrice(total?: PriceInfo) {
   if (!total) {
     return { label: "Preco indisponivel", original: "", discount: "" };
   }
 
   const hasPrice =
     typeof total.discountPrice === "number" ||
-    typeof total.originalPrice === "number";
+    typeof total.basePrice === "number";
   if (!hasPrice) {
     return { label: "Preco indisponivel", original: "", discount: "" };
   }
 
   const currency = total.currencyCode ?? "BRL";
   const discountPrice = total.discountPrice ?? 0;
-  const originalPrice = total.originalPrice ?? 0;
-  const discountPercentage = total.discountPercentage ?? 0;
+  const originalPrice = total.basePrice ?? 0;
+  const discountPercentage = total.discount ?? 0;
   const isFree = discountPrice === 0 && originalPrice === 0;
   const isPromoFree = discountPrice === 0 && originalPrice > 0;
 
@@ -99,18 +81,18 @@ function resolvePrice(total?: StorePrice) {
   return { label: "Preco indisponivel", original: "", discount: "" };
 }
 
-export function StoreGameCard({ game }: Props) {
+function StoreGameCardComponent({ game }: Props) {
   const image = pickImage(game.keyImages);
-  const priceInfo = resolvePrice(game.price?.totalPrice);
+  const priceInfo = resolvePrice(game.price);
 
-  const handleOpen = () => {
+  const handleOpen = useCallback(() => {
     if (!game.productSlug) {
       return;
     }
     const slug = game.productSlug.replace(/^\/+/, "");
     const url = `https://store.epicgames.com/pt-BR/p/${slug}`;
     window.open(url, "_blank");
-  };
+  }, [game.productSlug]);
 
   return (
     <div
@@ -122,6 +104,7 @@ export function StoreGameCard({ game }: Props) {
           <img
             src={image}
             alt={game.title ?? "Epic Store"}
+            loading="lazy"
             className="w-full h-full object-cover group-hover:scale-105 transition"
           />
         ) : (
@@ -152,3 +135,5 @@ export function StoreGameCard({ game }: Props) {
     </div>
   );
 }
+
+export const StoreGameCard = memo(StoreGameCardComponent);

@@ -6,6 +6,10 @@ import {
   getEpicFriends,
   getLegendaryStatus,
 } from "../api/legendaryApiService";
+import type {
+  GraphQLWishlistItem,
+  GraphQLFriend,
+} from "../types/EpicGame";
 
 type ProfileData = {
   displayName: string;
@@ -22,8 +26,8 @@ export function Profile() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [wishlistError, setWishlistError] = useState<string | null>(null);
   const [friendsError, setFriendsError] = useState<string | null>(null);
-  const [wishlistItems, setWishlistItems] = useState<any[]>([]);
-  const [friends, setFriends] = useState<any[]>([]);
+  const [wishlistItems, setWishlistItems] = useState<GraphQLWishlistItem[]>([]);
+  const [friends, setFriends] = useState<GraphQLFriend[]>([]);
 
   const getGraphqlFriendlyError = (error: unknown) => {
     const message = String(error ?? "");
@@ -153,19 +157,23 @@ export function Profile() {
   const wishlistCards = useMemo(() => {
     return wishlistItems
       .map((item) => {
-        const offer = item?.offer ?? item?.elements?.offer ?? null;
-        const offerId = typeof item?.offerId === "string" ? item.offerId : undefined;
-        const title =
+        const offer = (item as Record<string, any>)?.offer ?? 
+                     (item as Record<string, any>)?.elements?.offer ?? 
+                     null;
+        const offerId = typeof (item as Record<string, any>)?.offerId === "string" 
+          ? (item as Record<string, any>).offerId 
+          : undefined;
+        const title: string =
           offer?.title ??
           offer?.name ??
-          item?.offer?.title ??
+          (item as Record<string, any>)?.offer?.title ??
           offerId ??
           "Item";
-        const images = offer?.keyImages ?? item?.offer?.keyImages ?? [];
+        const images = offer?.keyImages ?? (item as Record<string, any>)?.offer?.keyImages ?? [];
         const image =
-          images.find((img: any) => img.type?.includes("Wide"))?.url ??
-          images.find((img: any) => img.type?.includes("Diesel"))?.url ??
-          images[0]?.url ??
+          (Array.isArray(images) ? images.find((img: any) => img.type?.includes("Wide"))?.url : undefined) ??
+          (Array.isArray(images) ? images.find((img: any) => img.type?.includes("Diesel"))?.url : undefined) ??
+          (Array.isArray(images) ? images[0]?.url : undefined) ??
           "/placeholder.png";
         return { title, image };
       })
@@ -174,15 +182,21 @@ export function Profile() {
 
   const friendsList = useMemo(() => {
     return friends.map((friend) => ({
-      id: friend?.accountId ?? friend?.id ?? friend?.account_id ?? String(friend?.accountId ?? ""),
+      id: (friend as Record<string, any>)?.accountId ?? 
+           (friend as Record<string, any>)?.id ?? 
+           (friend as Record<string, any>)?.account_id ?? 
+           String((friend as Record<string, any>)?.accountId ?? ""),
       name:
-        friend?.displayName ??
-        friend?.display_name ??
-        friend?.name ??
-        friend?.alias ??
-        friend?.accountId ??
+        (friend as Record<string, any>)?.displayName ??
+        (friend as Record<string, any>)?.display_name ??
+        (friend as Record<string, any>)?.name ??
+        (friend as Record<string, any>)?.alias ??
+        (friend as Record<string, any>)?.accountId ??
         "Amigo",
-      status: friend?.status ?? friend?.presence ?? friend?.connection ?? undefined,
+      status: (friend as Record<string, any>)?.status ?? 
+              (friend as Record<string, any>)?.presence ?? 
+              (friend as Record<string, any>)?.connection ?? 
+              undefined,
     }));
   }, [friends]);
 

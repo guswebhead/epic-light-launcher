@@ -1,6 +1,8 @@
 use crate::legendary;
 use crate::epic_graphql;
 use crate::epic_store;
+use crate::local_auth;
+use crate::secure_store;
 
 #[tauri::command]
 pub fn legendary_list_games() -> Result<String, String> {
@@ -147,4 +149,60 @@ pub fn epic_store_clear_user_agent() -> Result<(), String> {
 #[tauri::command]
 pub fn epic_store_user_agent_status() -> Result<bool, String> {
     epic_store::store_user_agent_status()
+}
+
+#[tauri::command]
+pub fn local_auth_register(username: String, password: String) -> Result<local_auth::AuthUser, String> {
+    local_auth::register(username, password)
+}
+
+#[tauri::command]
+pub fn local_auth_login(username: String, password: String) -> Result<local_auth::AuthUser, String> {
+    local_auth::login(username, password)
+}
+
+#[tauri::command]
+pub fn local_auth_logout() -> Result<(), String> {
+    local_auth::logout()
+}
+
+#[tauri::command]
+pub fn local_auth_current_user() -> Result<Option<local_auth::AuthUser>, String> {
+    local_auth::current_user()
+}
+
+#[tauri::command]
+pub fn local_user_game_data_upsert(
+    app_name: String,
+    custom_tags: Vec<String>,
+    notes: String,
+    playtime_minutes: i64,
+    rating: Option<i64>,
+) -> Result<local_auth::UserGameData, String> {
+    local_auth::upsert_game_data(app_name, custom_tags, notes, playtime_minutes, rating)
+}
+
+#[tauri::command]
+pub fn local_user_game_data_get(app_name: String) -> Result<Option<local_auth::UserGameData>, String> {
+    local_auth::get_game_data(app_name)
+}
+
+#[tauri::command]
+pub fn local_user_game_data_list() -> Result<Vec<local_auth::UserGameData>, String> {
+    local_auth::list_game_data()
+}
+
+#[tauri::command]
+pub fn secure_store_set_supabase_session(session_json: String) -> Result<(), String> {
+    secure_store::set_supabase_session(session_json)
+}
+
+#[tauri::command]
+pub fn secure_store_get_supabase_session() -> Result<Option<String>, String> {
+    secure_store::get_supabase_session()
+}
+
+#[tauri::command]
+pub fn secure_store_clear_supabase_session() -> Result<(), String> {
+    secure_store::clear_supabase_session()
 }
