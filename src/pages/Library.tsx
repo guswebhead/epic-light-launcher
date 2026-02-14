@@ -1,24 +1,24 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import {
-  getEpicLibraryPaginated,
-  searchEpicLibraryPaginated,
+  getEpicLibraryVirtual,
   reauthLegendary,
 } from "../api/legendaryApiService";
 import { GameCard } from "../components/GameCard";
 import { GameCardSkeleton } from "../components/GameCardSkeleton";
 import { LibrarySearchBar } from "../components/LibrarySearchBar";
-import { LibraryPagination } from "../components/LibraryPagination";
 import { LibraryErrorAlert } from "../components/LibraryErrorAlert";
 import { useDebounce } from "../hooks/useDebounce";
-import type { EpicGame, PaginatedData } from "../types/EpicGame";
+import { useVirtualGrid } from "../hooks/useVirtualGrid";
+import type { EpicGame } from "../types/EpicGame";
 
-const PAGE_SIZE = 36;
+// Virtual scroll configuration
+const ITEM_HEIGHT = 260; // GameCard height + gap
+const COLUMNS_PER_ROW = 5; // lg:grid-cols-5
+const GAP = 16;
 
 export function Library() {
-  const [games, setGames] = useState<EpicGame[]>([]);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [allGames, setAllGames] = useState<EpicGame[]>([]);
   const [loading, setLoading] = useState(true);
-  const [totalPages, setTotalPages] = useState(1);
   const [totalGames, setTotalGames] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [needsAuth, setNeedsAuth] = useState(false);
@@ -27,55 +27,51 @@ export function Library() {
   const [refreshTick, setRefreshTick] = useState(0);
 
   const debouncedSearch = useDebounce(searchTerm, 300);
-  const inFlightRef = useRef<Map<string, Promise<PaginatedData<EpicGame>>>>(
-    new Map()
-  );
-  const requestIdRef = useRef(0);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [debouncedSearch]);
-
-  useEffect(() => {
-    const trimmedSearch = debouncedSearch.trim();
-    const requestKey = `${trimmedSearch}:${currentPage}:${PAGE_SIZE}`;
-    const requestId = ++requestIdRef.current;
-    const isSearching = trimmedSearch.length > 0;
-
-    let requestPromise = inFlightRef.current.get(requestKey);
-    if (!requestPromise) {
-      const fetcher = isSearching
-        ? searchEpicLibraryPaginated(trimmedSearch, currentPage, PAGE_SIZE)
-        : getEpicLibraryPaginated(currentPage, PAGE_SIZE);
-      requestPromise = fetcher.finally(() => {
-        inFlightRef.current.delete(requestKey);
-      });
-      inFlightRef.current.set(requestKey, requestPromise);
+  // Filter games based on search term
+  const filteredGames = useMemo(() => {
+    if (!debouncedSearch.trim()) {
+      return allGames;
     }
+    const query = debouncedSearch.toLowerCase();
+    return allGames.filter(
+      (game) =>
+        game.app_title?.toLowerCase().includes(query) ||
+        game.app_name?.toLowerCase().includes(query)
+    );
+  }, [allGames, debouncedSearch]);
 
+  // Initialize virtual grid
+  const {
+    parentRef,
+    visibleItems,
+    paddingTop,
+    paddingBottom,
+  } = useVirtualGrid({
+    items: filteredGames,
+    columnsPerRow: COLUMNS_PER_ROW,
+    itemHeight: ITEM_HEIGHT,
+    gap: GAP,
+    overscan: 10,
+  });
+
+  // Load all games on mount
+  useEffect(() => {
+    let active = true;
     setLoading(true);
     setErrorMessage(null);
 
-    requestPromise
-      .then((libraryResponse) => {
-        if (requestId !== requestIdRef.current) {
-          return;
-        }
-
-        setGames(libraryResponse.items);
-        const nextTotalPages = Math.max(1, libraryResponse.total_pages || 1);
-        setTotalPages(nextTotalPages);
-        setTotalGames(libraryResponse.total);
+    getEpicLibraryVirtual()
+      .then((games) => {
+        if (!active) return;
+        setAllGames(games);
+        setTotalGames(games.length);
         setNeedsAuth(false);
-        if (currentPage > nextTotalPages) {
-          setCurrentPage(nextTotalPages);
-        }
       })
       .catch((error) => {
+        if (!active) return;
         console.error("Erro ao carregar biblioteca:", error);
-        if (error instanceof Error) {
-          console.error("Detalhes do erro:", error.message);
-        }
         const rawMessage = String(error ?? "");
         if (rawMessage.includes("403 Client Error")) {
           setErrorMessage(
@@ -86,20 +82,19 @@ export function Library() {
           setErrorMessage("Falha ao carregar a biblioteca. Tente novamente.");
           setNeedsAuth(false);
         }
-        setGames([]);
-        setTotalPages(1);
+        setAllGames([]);
         setTotalGames(0);
       })
       .finally(() => {
-        if (requestId === requestIdRef.current) {
+        if (active) {
           setLoading(false);
         }
       });
 
     return () => {
-      requestIdRef.current += 1;
+      active = false;
     };
-  }, [currentPage, refreshTick, debouncedSearch]);
+  }, [refreshTick]);
 
   const handleReauth = async () => {
     try {
@@ -119,20 +114,6 @@ export function Library() {
     }
   };
 
-  const handlePreviousPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-  };
-
-  const handleNextPage = () => {
-    if (currentPage < totalPages) {
-      setCurrentPage(currentPage + 1);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-  };
-
   return (
     <div>
       <h1 className="text-2xl font-bold mb-4">Biblioteca</h1>
@@ -148,23 +129,54 @@ export function Library() {
         />
       )}
 
-      <p className="text-sm text-gray-400 mb-2">Total de jogos: {totalGames}</p>
+      <p className="text-sm text-gray-400 mb-4">
+        Exibindo {filteredGames.length} de {totalGames} jogos
+      </p>
 
-      {/* Card game */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-        {loading && [...Array(24)].map((_, i) => <GameCardSkeleton key={i} />)}
+      {/* Virtual scrolling grid container */}
+      <div
+        ref={containerRef}
+        style={{ height: "70vh", overflow: "auto" }}
+        className="border border-gray-800 rounded-lg bg-gray-900/50"
+      >
+        <div
+          ref={parentRef}
+          style={{ height: "100%", overflow: "auto" }}
+          className="space-y-4"
+        >
+          {loading && !allGames.length ? (
+            <div className="grid gap-4 p-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+              {[...Array(20)].map((_, i) => (
+                <GameCardSkeleton key={i} />
+              ))}
+            </div>
+          ) : filteredGames.length === 0 ? (
+            <div className="flex items-center justify-center h-full text-gray-400">
+              Nenhum jogo encontrado
+            </div>
+          ) : (
+            <div
+              style={{ height: `${paddingTop}px` }}
+              className="pointer-events-none"
+            />
+          )}
 
-        {!loading &&
-          games.map((game) => <GameCard key={game.app_name} game={game} />)}
+          {/* Render visible items in grid */}
+          {visibleItems.length > 0 && (
+            <div className="grid gap-4 p-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+              {visibleItems.map(({ item: game, index }) => (
+                <GameCard key={`${game.app_name}-${index}`} game={game} />
+              ))}
+            </div>
+          )}
+
+          {/* Bottom padding for remaining items */}
+          <div
+            style={{ height: `${paddingBottom}px` }}
+            className="pointer-events-none"
+          />
+        </div>
       </div>
-
-      {/* Paginação */}
-      <LibraryPagination
-        currentPage={currentPage}
-        totalPages={totalPages}
-        onPreviousPage={handlePreviousPage}
-        onNextPage={handleNextPage}
-      />
     </div>
   );
 }

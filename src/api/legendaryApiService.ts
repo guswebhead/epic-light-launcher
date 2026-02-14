@@ -68,6 +68,22 @@ export async function getEpicLibrary() {
   });
 }
 
+export async function getEpicLibraryVirtual(): Promise<EpicGame[]> {
+  return dedupeRequest("legendary_list_games_virtual", async () => {
+    const data = await invoke<string>("legendary_list_games");
+    const parsed = typeof data === "string" ? JSON.parse(data) : data;
+    // Handle both array and paginated response formats
+    if (Array.isArray(parsed)) {
+      return parsed;
+    }
+    if (parsed.items && Array.isArray(parsed.items)) {
+      return parsed.items;
+    }
+    return [];
+  });
+}
+
+
 export async function getInstalledEpicGames() {
   return dedupeRequest("legendary_list_installed", async () => {
     const data = await invoke<string>("legendary_list_installed");

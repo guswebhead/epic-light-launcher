@@ -10,6 +10,7 @@ type Props = {
 function GameCardComponent({ game }: Props) {
   const navigate = useNavigate();
   const image = getGameImage(game);
+  const title = game.app_title?.trim() || game.metadata?.title || "Sem titulo";
 
   const handleNavigate = useCallback(() => {
     navigate(`/game/${game.app_name}`, { state: { game } });
@@ -18,17 +19,20 @@ function GameCardComponent({ game }: Props) {
   return (
     <div
       onClick={handleNavigate}
-      className="relative cursor-pointer group rounded overflow-hidden bg-gray-800 hover:shadow-xl transition"
+      className="group cursor-pointer overflow-hidden rounded-lg border border-gray-800 bg-gray-900 transition hover:border-gray-700 hover:shadow-xl"
     >
-      <img
-        src={image}
-        alt={game.app_title}
-        loading="lazy"
-        className="w-full h-64 object-cover group-hover:scale-105 transition"
-      />
+      <div className="relative h-40 bg-gradient-to-br from-gray-800 to-gray-950">
+        <img
+          src={image}
+          alt={title}
+          loading="lazy"
+          className="h-full w-full object-cover transition group-hover:scale-105"
+        />
+      </div>
 
-      <div className="absolute bottom-0 w-full bg-gradient-to-t from-black p-2">
-        <h3 className="text-sm font-semibold truncate">{game.app_title}</h3>
+      <div className="space-y-1 p-3">
+        <h3 className="truncate text-sm font-semibold text-gray-100">{title}</h3>
+        <p className="truncate text-xs text-gray-400">{game.app_name}</p>
       </div>
     </div>
   );

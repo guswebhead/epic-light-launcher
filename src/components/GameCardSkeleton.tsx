@@ -2,11 +2,11 @@ import { memo } from "react";
 
 function GameCardSkeletonComponent() {
   return (
-    <div className="bg-gray-800 rounded overflow-hidden animate-pulse">
-      <div className="h-64 bg-gray-700" />
-      <div className="p-2">
-        <div className="h-4 bg-gray-700 rounded w-3/4 mb-2" />
-        <div className="h-3 bg-gray-700 rounded w-1/2" />
+    <div className="animate-pulse overflow-hidden rounded-lg border border-gray-800 bg-gray-900">
+      <div className="h-40 bg-gray-800" />
+      <div className="space-y-2 p-3">
+        <div className="h-4 w-3/4 rounded bg-gray-700" />
+        <div className="h-3 w-1/2 rounded bg-gray-700" />
       </div>
     </div>
   );

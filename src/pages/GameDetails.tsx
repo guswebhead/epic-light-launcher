@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLocation, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { getEpicGameDetails } from "../api/legendaryApiService";
 import {
   getUserDataBackendStatus,
@@ -19,6 +19,7 @@ interface LocationState {
 export function GameDetails() {
   const { appName } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const stateGame = (location.state as LocationState | null)?.game;
 
   const [game, setGame] = useState<EpicGame | null>(null);
@@ -221,153 +222,207 @@ export function GameDetails() {
     ].filter((item) => Boolean(item.value));
   }, [game]);
 
+  const handleBackToLibrary = () => {
+    navigate("/library");
+  };
+
   if (loading) {
-    return <p>Carregando...</p>;
+    return (
+      <div className="space-y-4">
+        <button
+          onClick={handleBackToLibrary}
+          className="inline-flex items-center rounded border border-gray-700 bg-gray-900 px-3 py-2 text-sm font-medium text-gray-100 transition hover:bg-gray-800"
+        >
+          Voltar para biblioteca
+        </button>
+        <p>Carregando...</p>
+      </div>
+    );
   }
 
   if (errorMessage) {
-    return <p className="text-red-200">{errorMessage}</p>;
+    return (
+      <div className="space-y-4">
+        <button
+          onClick={handleBackToLibrary}
+          className="inline-flex items-center rounded border border-gray-700 bg-gray-900 px-3 py-2 text-sm font-medium text-gray-100 transition hover:bg-gray-800"
+        >
+          Voltar para biblioteca
+        </button>
+        <p className="text-red-200">{errorMessage}</p>
+      </div>
+    );
   }
 
   if (!game) {
-    return <p>Jogo nao encontrado.</p>;
+    return (
+      <div className="space-y-4">
+        <button
+          onClick={handleBackToLibrary}
+          className="inline-flex items-center rounded border border-gray-700 bg-gray-900 px-3 py-2 text-sm font-medium text-gray-100 transition hover:bg-gray-800"
+        >
+          Voltar para biblioteca
+        </button>
+        <p>Jogo nao encontrado.</p>
+      </div>
+    );
   }
 
   return (
-    <div className="grid gap-6 md:grid-cols-[280px_1fr]">
-      <div className="space-y-4">
-        <img src={getGameImage(game)} alt={title} className="w-full rounded shadow-lg" />
+    <div className="space-y-4">
+      <button
+        onClick={handleBackToLibrary}
+        className="inline-flex items-center rounded border border-gray-700 bg-gray-900 px-3 py-2 text-sm font-medium text-gray-100 transition hover:bg-gray-800"
+      >
+        Voltar para biblioteca
+      </button>
 
-        <div className="rounded bg-gray-800/60 p-3 text-sm text-gray-300">
-          {infoItems.map((item) => (
-            <div key={item.label} className="flex justify-between gap-2">
-              <span className="text-gray-400">{item.label}</span>
-              <span className="text-right text-gray-100">{item.value}</span>
-            </div>
-          ))}
-        </div>
-      </div>
+      <div className="grid gap-6 md:grid-cols-[280px_1fr]">
+        <div className="space-y-4">
+          <img
+            src={getGameImage(game)}
+            alt={title}
+            className="w-full rounded shadow-lg"
+          />
 
-      <div className="space-y-4">
-        <div>
-          <h1 className="text-3xl font-bold">{title}</h1>
-          {game?.app_name && (
-            <p className="text-sm text-gray-400">AppName: {game.app_name}</p>
-          )}
-        </div>
-
-        {description && <p className="leading-relaxed text-gray-300">{description}</p>}
-
-        <div className="flex flex-wrap gap-3">
-          <button
-            className="cursor-not-allowed rounded bg-green-600 px-4 py-2 opacity-60"
-            disabled
-          >
-            Jogar
-          </button>
-          <button
-            className="cursor-not-allowed rounded bg-blue-600 px-4 py-2 opacity-60"
-            disabled
-          >
-            Abrir na Epic
-          </button>
+          <div className="rounded bg-gray-800/60 p-3 text-sm text-gray-300">
+            {infoItems.map((item) => (
+              <div key={item.label} className="flex justify-between gap-2">
+                <span className="text-gray-400">{item.label}</span>
+                <span className="text-right text-gray-100">{item.value}</span>
+              </div>
+            ))}
+          </div>
         </div>
 
-        <div className="space-y-4 rounded border border-gray-800 bg-gray-800/50 p-4">
+        <div className="space-y-4">
           <div>
-            <h2 className="text-lg font-semibold">Dados de Usuario (Local/Cloud)</h2>
-            <p className="text-sm text-gray-400">
-              Tags customizadas, notas, tempo jogado e rating com fallback offline.
-            </p>
-            {backendStatus && (
-              <p className="mt-1 text-xs text-gray-500">
-                Provider solicitado: {backendStatus.requestedProvider} | ativo:{" "}
-                {backendStatus.activeProvider}. {backendStatus.note}
-              </p>
+            <h1 className="text-3xl font-bold">{title}</h1>
+            {game?.app_name && (
+              <p className="text-sm text-gray-400">AppName: {game.app_name}</p>
             )}
           </div>
 
-          {localDataLoading ? (
-            <p className="text-sm text-gray-400">Carregando dados locais...</p>
-          ) : (
-            <>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="md:col-span-2">
-                  <label className="mb-1 block text-sm text-gray-300">
-                    Tags (separadas por virgula)
-                  </label>
-                  <input
-                    value={customTagsInput}
-                    onChange={(event) => setCustomTagsInput(event.target.value)}
-                    placeholder="coop, backlog, terminar"
-                    className="w-full rounded border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-gray-100 outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm text-gray-300">
-                    Tempo jogado (minutos)
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={playtimeInput}
-                    onChange={(event) => setPlaytimeInput(event.target.value)}
-                    className="w-full rounded border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-gray-100 outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm text-gray-300">Rating</label>
-                  <select
-                    value={ratingInput}
-                    onChange={(event) => setRatingInput(event.target.value)}
-                    className="w-full rounded border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-gray-100 outline-none focus:border-blue-500"
-                  >
-                    <option value="">Sem nota</option>
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                    <option value="3">3</option>
-                    <option value="4">4</option>
-                    <option value="5">5</option>
-                  </select>
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="mb-1 block text-sm text-gray-300">Notas</label>
-                  <textarea
-                    value={notesInput}
-                    onChange={(event) => setNotesInput(event.target.value)}
-                    rows={5}
-                    placeholder="Resumo rapido do que voce achou do jogo..."
-                    className="w-full rounded border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-gray-100 outline-none focus:border-blue-500"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={handleSaveLocalData}
-                  disabled={savingLocalData}
-                  className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500 disabled:opacity-60"
-                >
-                  {savingLocalData ? "Salvando..." : "Salvar dados locais"}
-                </button>
-
-                {localDataMessage && (
-                  <p
-                    className={`text-sm ${
-                      localSaveStatus === "error"
-                        ? "text-red-200"
-                        : "text-green-300"
-                    }`}
-                  >
-                    {localDataMessage}
-                  </p>
-                )}
-              </div>
-            </>
+          {description && (
+            <p className="leading-relaxed text-gray-300">{description}</p>
           )}
+
+          <div className="flex flex-wrap gap-3">
+            <button
+              className="cursor-not-allowed rounded bg-green-600 px-4 py-2 opacity-60"
+              disabled
+            >
+              Jogar
+            </button>
+            <button
+              className="cursor-not-allowed rounded bg-blue-600 px-4 py-2 opacity-60"
+              disabled
+            >
+              Abrir na Epic
+            </button>
+          </div>
+
+          <div className="space-y-4 rounded border border-gray-800 bg-gray-800/50 p-4">
+            <div>
+              <h2 className="text-lg font-semibold">
+                Dados de Usuario (Local/Cloud)
+              </h2>
+              <p className="text-sm text-gray-400">
+                Tags customizadas, notas, tempo jogado e rating com fallback
+                offline.
+              </p>
+              {backendStatus && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Provider solicitado: {backendStatus.requestedProvider} | ativo:{" "}
+                  {backendStatus.activeProvider}. {backendStatus.note}
+                </p>
+              )}
+            </div>
+
+            {localDataLoading ? (
+              <p className="text-sm text-gray-400">Carregando dados locais...</p>
+            ) : (
+              <>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="md:col-span-2">
+                    <label className="mb-1 block text-sm text-gray-300">
+                      Tags (separadas por virgula)
+                    </label>
+                    <input
+                      value={customTagsInput}
+                      onChange={(event) => setCustomTagsInput(event.target.value)}
+                      placeholder="coop, backlog, terminar"
+                      className="w-full rounded border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-gray-100 outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-sm text-gray-300">
+                      Tempo jogado (minutos)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={playtimeInput}
+                      onChange={(event) => setPlaytimeInput(event.target.value)}
+                      className="w-full rounded border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-gray-100 outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-sm text-gray-300">
+                      Rating
+                    </label>
+                    <select
+                      value={ratingInput}
+                      onChange={(event) => setRatingInput(event.target.value)}
+                      className="w-full rounded border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-gray-100 outline-none focus:border-blue-500"
+                    >
+                      <option value="">Sem nota</option>
+                      <option value="1">1</option>
+                      <option value="2">2</option>
+                      <option value="3">3</option>
+                      <option value="4">4</option>
+                      <option value="5">5</option>
+                    </select>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="mb-1 block text-sm text-gray-300">Notas</label>
+                    <textarea
+                      value={notesInput}
+                      onChange={(event) => setNotesInput(event.target.value)}
+                      rows={5}
+                      placeholder="Resumo rapido do que voce achou do jogo..."
+                      className="w-full rounded border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-gray-100 outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handleSaveLocalData}
+                    disabled={savingLocalData}
+                    className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500 disabled:opacity-60"
+                  >
+                    {savingLocalData ? "Salvando..." : "Salvar dados locais"}
+                  </button>
+
+                  {localDataMessage && (
+                    <p
+                      className={`text-sm ${
+                        localSaveStatus === "error"
+                          ? "text-red-200"
+                          : "text-green-300"
+                      }`}
+                    >
+                      {localDataMessage}
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>
